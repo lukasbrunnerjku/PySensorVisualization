@@ -1,4 +1,5 @@
 from OpenGL.GL import *
+import glm
 
 class Shader():
 
@@ -50,4 +51,4 @@ class Shader():
 
     def setMatrix(self, name, matrix):
         """Always have a program in use before calling this function!"""
-        glUniformMatrix4fv(glGetUniformLocation(self.id, name), 1, False, matrix)
+        glUniformMatrix4fv(glGetUniformLocation(self.id, name), 1, GL_FALSE, glm.value_ptr(matrix))

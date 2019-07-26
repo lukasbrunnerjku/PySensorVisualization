@@ -2,29 +2,46 @@ import pygame
 from pygame.locals import *
 
 from OpenGL.GL import *
-from OpenGL.GLU import *
+#from OpenGL.GLU import *
 
 import sys
 import math
+import glm
+import time
 
 import numpy as np
-from ctypes import c_void_p
 
 # my modules:
-from shader import *
+from shader import Shader
+from mesh import Mesh
+from camera import Camera
 
 # create a window, OpenGL are callable after window initialization!
 pygame.init()
-pygame.display.set_mode((800, 600), flags=DOUBLEBUF|OPENGL)
+width = 800
+height = 600
+pygame.display.set_mode((width, height), flags=DOUBLEBUF|OPENGL)
 
 # OpenGL initialization:
-glViewport(0, 0, 800, 600)
+glViewport(0, 0, width, height)
 glEnable(GL_DEPTH_TEST)
 glClearColor(0.5, 0.5, 0.5, 1.0)
 
 # create the shader program to run on the gpu:
 shader = Shader("shader.vs", "shader.fs")
 shader.use()
+
+# set the model, view and projection matrices:
+model = glm.mat4()
+model = glm.scale(model, glm.vec3(0.5, 0.5, 0.5))
+shader.setMatrix("model", model)
+
+camera = Camera()
+view = camera.getViewMatrix()
+shader.setMatrix("view", view)
+
+projection = glm.perspective(glm.radians(45.0), width/height, 0.1, 100.0)
+shader.setMatrix("projection", projection)
 
 # create vertices:
 data = np.zeros(8, [("position", np.float32, 3),
@@ -33,8 +50,6 @@ data["position"] = [[ 1, 1, 1], [-1, 1, 1], [-1,-1, 1], [ 1,-1, 1],
                     [ 1,-1,-1], [ 1, 1,-1], [-1, 1,-1], [-1,-1,-1]]
 data["color"]    = [[0, 1, 1, 1], [0, 0, 1, 1], [0, 0, 0, 1], [0, 1, 0, 1],
                     [1, 1, 0, 1], [1, 1, 1, 1], [1, 0, 1, 1], [1, 0, 0, 1]]
-
-stride = data.strides[0]
 
 # front faces are defined counter clockwise (face culling)
 indices = np.array([
@@ -58,34 +73,39 @@ indices = np.array([
     3, 4, 7
 ], dtype=np.uint32)
 
+# create an object ready for drawing:
+mesh = Mesh(data, indices)
 
-# vertex buffer object:
-VBO = glGenBuffers(1)
-glBindBuffer(GL_ARRAY_BUFFER, VBO)
-glBufferData(GL_ARRAY_BUFFER, data.nbytes, data, GL_STATIC_DRAW)
+# initialize the last_frame_time:
+last_frame_time = time.time()
 
-# element buffer object:
-EBO = glGenBuffers(1)
-glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
-glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL_STATIC_DRAW)
+# initialize last mouse position to be centered in screen
+last_x = width/2
+last_y = height/2
+# set the mouse position to the center of the screen:
+pygame.mouse.set_pos([last_x, last_y])
+pygame.mouse.set_visible(False)
+# mouse can no longer leave the window:
+pygame.event.set_grab(True)
 
-# positions:
-offset = c_void_p(0)
-glEnableVertexAttribArray(0) # layout(location = 0)
-glVertexAttribPointer(0, 3, GL_FLOAT, False, stride, offset)
-# colors:
-offset = c_void_p(data.dtype["position"].itemsize)
-glEnableVertexAttribArray(1) # layout(location = 1)
-glVertexAttribPointer(1, 4, GL_FLOAT, False, stride, offset)
+# initialize keyboard status:
+w_pressed = False
+a_pressed = False
+s_pressed = False
+d_pressed = False
 
 # game loop
 while True:
+    current_frame_time = time.time()
+    deltaTime = current_frame_time - last_frame_time
+    last_frame_time = current_frame_time
+
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 
-    # draw
-    offset = c_void_p(0)
-    glDrawElements(GL_TRIANGLES, indices.size, GL_UNSIGNED_INT, offset)
+    # draw the object:
+    mesh.draw()
 
+    # input handler:
     for event in pygame.event.get():
         if event.type == QUIT:
             pygame.quit()
@@ -95,15 +115,41 @@ while True:
                 pygame.quit()
                 sys.exit()
             if event.key == K_w:
-                print("w")
+                w_pressed = True
             if event.key == K_a:
-                print("a")
+                a_pressed = True
             if event.key == K_s:
-                print("s")
+                s_pressed = True
             if event.key == K_d:
-                print("d")
+                d_pressed = True
+        elif event.type == KEYUP:
+            if event.key == K_w:
+                w_pressed = False
+            if event.key == K_a:
+                a_pressed = False
+            if event.key == K_s:
+                s_pressed = False
+            if event.key == K_d:
+                d_pressed = False
+        elif event.type == MOUSEMOTION:
+            x, y = event.pos
+            camera.processMouseMovement(x - last_x, last_y - y)
+            last_x, last_y = x, y
 
-    # delay in ms
+    if w_pressed:
+        camera.processKeyboard("forward", deltaTime)
+    if a_pressed:
+        camera.processKeyboard("left", deltaTime)
+    if s_pressed:
+        camera.processKeyboard("backward", deltaTime)
+    if d_pressed:
+        camera.processKeyboard("right", deltaTime)
+
+    # update the view matrix in the shader to simulate the camera's view:
+    view = camera.getViewMatrix()
+    shader.setMatrix("view", view)
+
+    # delay in ms:
     pygame.time.wait(10)
 
     # when using the OPENGL pygame display mode this is equivalent to
