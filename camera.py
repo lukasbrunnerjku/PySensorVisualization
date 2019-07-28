@@ -8,8 +8,8 @@ class Camera():
                  front=glm.vec3(0.0, 0.0, -1.0),
                  yaw=-90.0,
                  pitch=0.0,
-                 movementSpeed=2.5,
-                 mouseSensitivity=0.1):
+                 movementSpeed=3.0,
+                 mouseSensitivity=0.2):
         # position of the camera:
         self.position = position
         # up vector of the camera:
