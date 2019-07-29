@@ -60,3 +60,6 @@ class Mesh():
                                           self.drawing_info["offsets"],
                                           self.drawing_info["sizes"]):
                 self._draw(mode, size, offset)
+
+    def __repr__(self):
+        return "data: {}\nindices: {}\ndrawing_info: {}".format(self.data, self.indices, self.drawing_info)
