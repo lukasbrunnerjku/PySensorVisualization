@@ -45,6 +45,16 @@ class Shader():
         """Always have a program in use before calling any glUniform...!"""
         glUseProgram(self.id)
 
+    # e.g in the shader write: uniform int index; -> name = "index"
+    def setInt(self, name, x):
+        """Always have a program in use before calling this function!"""
+        glUniform1i(glGetUniformLocation(self.id, name), x)
+
+    def setFloat(self, name, x):
+        """Always have a program in use before calling this function!"""
+        glUniform1f(glGetUniformLocation(self.id, name), x)
+
+
     def setVector(self, name, x, y, z):
         """Always have a program in use before calling this function!"""
         glUniform3f(glGetUniformLocation(self.id, name), x, y, z)
