@@ -25,29 +25,25 @@ glViewport(0, 0, width, height)
 glEnable(GL_DEPTH_TEST)
 glClearColor(0.5, 0.5, 0.5, 1.0)
 glEnable(GL_LINE_SMOOTH)
-glLineWidth(5)
+glLineWidth(4)
+
 
 # create an cylinder ready for drawing:
-positions, indices, drawing_info = Cylinder.create(1.0, [0.5, 1.5], mesh=False)
-print(positions)
-print("pos:", positions[indices[0]], positions[indices[34]], positions[indices[68]])
-print(indices)
-print(drawing_info)
-mesh = Cylinder.create(1.0, [0.0, 1.0, 2.0])
-#mesh = Cylinder.create(1.0, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+colors = [[0.0, 1.0, 0.0, 1.0],
+          [1.0, 0.0, 0.0, 1.0],
+          [0.0, 1.0, 0.0, 1.0]]
+mesh = Cylinder(1.0, [0.0, 1.0, 2.0], layer_colors=colors).getMesh()
 print(mesh)
 
 # create the shader program to run on the gpu:
 shader = Shader("shader.vs", "shader.fs")
 shader.use()
 
-index = 0
-shader.setInt("index", index)
+# use color provided by vertex not the uniform vec3 lineColor:
+shader.setInt("flag", 0)
 
-# set the transformation matrix:
-transformation = glm.mat4()
-transformation = glm.rotate(transformation, glm.radians(20.0), glm.vec3(0.0, 0.0, -1.0))
-shader.setMatrix("transformation", transformation)
+# set the uniform color to black (the corresponding shader must be in use):
+shader.setVector("outlineColor", 0.0, 0.0, 0.0)
 
 # set the model, view and projection matrices (the corresponding shader must be in use):
 model = glm.mat4()
@@ -79,17 +75,13 @@ a_pressed = False
 s_pressed = False
 d_pressed = False
 
-#line_shader = Shader("line_shader.vs", "line_shader.fs")
-#line_shader.use()
-
-# set the model, view and projection matrices (the corresponding shader must be in use):
-#line_shader.setMatrix("model", model)
-#line_shader.setMatrix("view", view)
-#line_shader.setMatrix("projection", projection)
-#line_shader.setMatrix("transformation", transformation)
-
-# set the uniform color to black (the corresponding shader must be in use):
-#line_shader.setVector("color", 0.0, 0.0, 0.0)
+# v = glm.vec4(1)
+# v.x, v.y, v.z = positions[0][0], positions[0][1], positions[0][2]
+# print(v)
+# transform = glm.mat4()
+# transform = glm.translate(transform, glm.vec3(0.0, -1.0, 0.0))
+# print(transform)
+# print(transform * v)
 
 
 # game loop
@@ -106,36 +98,18 @@ while True:
     # draw the object:
     shader.use()
     shader.setMatrix("view", view)
-    #mesh.draw()
+    # use color provided by vertex not the uniform vec3 lineColor:
+    shader.setInt("flag", 0)
+    mesh.draw()
 
+    # before drawing circles set the color for the fragment shader to lineColor:
+    shader.setInt("flag", 1)
     # draw the layer circles
-    # line_shader.use()
-    # line_shader.setMatrix("view", view)
-    # for mode, size, offset in zip(mesh.drawing_info["modes"],
-    #                               mesh.drawing_info["sizes"],
-    #                               mesh.drawing_info["offsets"]):
-    #     if mode == GL_TRIANGLE_FAN:
-    #         mesh._draw(GL_LINE_STRIP, size-1, offset+1)
-
-    # draw the components of a cylinder individually:
-    index = 1000
-    shader.setInt("index", index)
-    mesh._draw(GL_TRIANGLE_FAN, 34, 0)
-
-    index = 0
-    shader.setInt("index", index)
-    transformation = glm.mat4()
-    transformation = glm.rotate(transformation, glm.radians(20.0), glm.vec3(0.0, 0.0, -1.0))
-    shader.setMatrix("transformation", transformation)
-    mesh._draw(GL_TRIANGLE_FAN, 34, 34)
-    mesh._draw(GL_TRIANGLE_STRIP, 66, 68+34)
-
-    transformation = glm.mat4()
-    transformation = glm.rotate(transformation, glm.radians(40.0), glm.vec3(0.0, 0.0, -1.0))
-    shader.setMatrix("transformation", transformation)
-    mesh._draw(GL_TRIANGLE_FAN, 34, 68)
-    mesh._draw(GL_TRIANGLE_STRIP, 66, 68+34+66)
-
+    for mode, size, offset in zip(mesh.drawing_info["modes"],
+                                  mesh.drawing_info["sizes"],
+                                  mesh.drawing_info["offsets"]):
+        if mode == GL_TRIANGLE_FAN:
+            mesh._draw(GL_LINE_STRIP, size-1, offset+1)
 
     # input handler:
     for event in pygame.event.get():

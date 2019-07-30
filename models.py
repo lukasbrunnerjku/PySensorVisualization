@@ -4,9 +4,19 @@ from OpenGL.GL import *
 
 from mesh import Mesh
 
+# utility function:
+def structure_model_data(positions, colors, indices):
+    data = np.zeros(len(positions), [("position", np.float32, 3),
+                                     ("color",    np.float32, 4)])
+    data["position"] = positions
+    data["color"] = colors
+
+    indices = np.array(indices, dtype=np.uint32)
+    return data, indices
+
 class Circle():
 
-    def create(r, h, color, n=32, mesh=True):
+    def __init__(self, r, h, color, n=32):
         positions = [[0.0, h, 0.0]]
         colors = [color]
         indices = [0]
@@ -24,33 +34,42 @@ class Circle():
             index += 1
         indices.append(1)
 
-        if mesh:
-            data = np.zeros(len(positions), [("position", np.float32, 3),
-                                             ("color",    np.float32, 4)])
-            data["position"] = positions
-            data["color"] = colors
+        # contains entire circle information:
+        self.positions = positions
+        self.colors = colors
+        self.indices = indices
 
-            indices = np.array(indices, dtype=np.uint32)
-            # no need for further drawing information (see mesh.py):
-            return Mesh(data, indices)
-        else:
-            # to integrate the circle in a more complex model:
-            return positions, colors, indices
+    def getMesh(self):
+        data, indices = structure_model_data(self.positions,
+                                             self.colors,
+                                             self.indices)
+
+        # no need for further drawing information (see mesh.py):
+        return Mesh(data, indices)
+
+    def getStructuredData(self):
+        data, indices = structure_model_data(self.positions,
+                                             self.colors,
+                                             self.indices)
+
+        return data, indices
+
+    def getRawData(self):
+        # to integrate the circle in a more complex model:
+        return self.positions, self.colors, self.indices
 
 
 class Cylinder():
 
-    def create(r, heights, n=32, mesh=True):
+    def __init__(self, r, heights, layer_colors, n=32):
         positions, colors, indices, offsets = [], [], [], []
         drawing_info = {"modes":[], "offsets":[], "sizes":[]}
-        test_color = [[1.0, 0.0, 0.0, 1.0],
-                      [0.0, 1.0, 0.0, 1.0],
-                      [0.0, 0.0, 1.0, 1.0],
-                      [1.0, 0.0, 0.0, 1.0],
-                      [0.0, 1.0, 0.0, 1.0],
-                      [0.0, 0.0, 1.0, 1.0]]
+
         for layer_nr, h in enumerate(heights):
-            _positions, _colors, _indices = Circle.create(r, h, test_color[layer_nr], n=n, mesh=False)
+            _positions, _colors, _indices = Circle(r,
+                                                   h,
+                                                   layer_colors[layer_nr],
+                                                   n=n).getRawData()
             size_circle = len(_indices)
             drawing_info["modes"].append(GL_TRIANGLE_FAN)
             drawing_info["offsets"].append(layer_nr * size_circle)
@@ -75,15 +94,28 @@ class Cylinder():
             drawing_info["sizes"].append(size_mantle)
             indices.extend(_indices)
 
-        if mesh:
-            data = np.zeros(len(positions), [("position", np.float32, 3),
-                                             ("color",    np.float32, 4)])
-            data["position"] = positions
-            data["color"] = colors
-            # flatten the indices:
-            #indices = list(itertools.chain(*indices))
+        # contains entire cylinder information:
+        self.positions = positions
+        self.colors = colors
+        self.indices = indices
+        self.drawing_info = drawing_info
 
-            indices = np.array(indices, dtype=np.uint32)
-            return Mesh(data, indices, drawing_info)
-        else:
-            return positions, indices, drawing_info
+    def getMesh(self):
+        data, indices = structure_model_data(self.positions,
+                                             self.colors,
+                                             self.indices)
+
+        # drawing information needed since multiple drawing modes
+        # are required (see mesh.py):
+        return Mesh(data, indices, self.drawing_info)
+
+    def getStructuredData(self):
+        data, indices = structure_model_data(self.positions,
+                                             self.colors,
+                                             self.indices)
+
+        return data, indices, self.drawing_info
+
+    def getRawData(self):
+        # to integrate the circle in a more complex model:
+        return self.positions, self.colors, self.indices, self.drawing_info
