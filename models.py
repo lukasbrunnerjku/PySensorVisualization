@@ -14,30 +14,41 @@ def structure_model_data(positions, colors, indices):
     indices = np.array(indices, dtype=np.uint32)
     return data, indices
 
-class Circle():
+class Bridge():
 
-    def __init__(self, r, h, color, n=32):
-        positions = [[0.0, h, 0.0]]
-        colors = [color]
-        indices = [0]
-        phi = 0.0
-        deltaPhi = 360/n
-        index = 1
-        while phi < 360:
-            x = glm.cos(glm.radians(phi))
-            z = glm.sin(glm.radians(phi))
-            positions.append([x, h, z])
-            colors.append(color)
-            # indices for GL_TRIANGLE_FAN
-            indices.append(index)
-            phi += deltaPhi
-            index += 1
-        indices.append(1)
-
-        # contains entire circle information:
+    def __init__(self, positions, colors, indices):
+        drawing_info = {"modes":[], "offsets":[], "sizes":[]}
+        drawing_info["modes"].append(GL_TRIANGLE_STRIP)
+        drawing_info["offsets"].append(0)
+        drawing_info["sizes"].append(len(indices))
         self.positions = positions
-        self.colors = colors
         self.indices = indices
+        self.colors = colors
+        self.drawing_info = drawing_info
+
+    def getMesh(self):
+        data, indices = structure_model_data(self.positions,
+                                             self.colors,
+                                             self.indices)
+
+        # drawing information required since default mode is GL_TRIANGLES:
+        return Mesh(data, indices, self.drawing_info)
+
+class Rectangle():
+
+    def __init__(self, width, lenght, h, color):
+        positions = [[-width/2, h, -lenght/2],
+                     [width/2, h, -lenght/2],
+                     [width/2, h, lenght/2],
+                     [-width/2, h, lenght/2]]
+        # for GL_TRIANGLES
+        indices = [0, 1, 3,
+                   1, 2, 3]
+        colors = [color, color, color, color]
+
+        self.positions = positions
+        self.indices = indices
+        self.colors = colors
 
     def getMesh(self):
         data, indices = structure_model_data(self.positions,
@@ -55,8 +66,56 @@ class Circle():
         return data, indices
 
     def getRawData(self):
-        # to integrate the circle in a more complex model:
+        # to integrate the rectangle in a more complex model:
         return self.positions, self.colors, self.indices
+
+
+class Circle():
+
+    def __init__(self, r, h, color, n=32):
+        positions = [[0.0, h, 0.0]]
+        colors = [color]
+        indices = [0]
+        phi = 0.0
+        deltaPhi = 360/n
+        index = 1
+        while phi < 360:
+            x = r * glm.cos(glm.radians(phi))
+            z = r * glm.sin(glm.radians(phi))
+            positions.append([x, h, z])
+            colors.append(color)
+            # indices for GL_TRIANGLE_FAN
+            indices.append(index)
+            phi += deltaPhi
+            index += 1
+        indices.append(1)
+
+        # contains entire circle information:
+        self.positions = positions
+        self.colors = colors
+        self.indices = indices
+        self.drawing_info = {"modes":[GL_TRIANGLE_FAN],
+                             "offsets":[0],
+                             "sizes":[len(indices)]}
+
+    def getMesh(self):
+        data, indices = structure_model_data(self.positions,
+                                             self.colors,
+                                             self.indices)
+
+        # drawing information required since default mode is GL_TRIANGLES:
+        return Mesh(data, indices, self.drawing_info)
+
+    def getStructuredData(self):
+        data, indices = structure_model_data(self.positions,
+                                             self.colors,
+                                             self.indices)
+
+        return data, indices, self.drawing_info
+
+    def getRawData(self):
+        # to integrate the circle in a more complex model:
+        return self.positions, self.colors, self.indices, self.drawing_info
 
 
 class Cylinder():
@@ -66,10 +125,10 @@ class Cylinder():
         drawing_info = {"modes":[], "offsets":[], "sizes":[]}
 
         for layer_nr, h in enumerate(heights):
-            _positions, _colors, _indices = Circle(r,
-                                                   h,
-                                                   layer_colors[layer_nr],
-                                                   n=n).getRawData()
+            _positions, _colors, _indices, _ = Circle(r,
+                                                      h,
+                                                      layer_colors[layer_nr],
+                                                      n=n).getRawData()
             size_circle = len(_indices)
             drawing_info["modes"].append(GL_TRIANGLE_FAN)
             drawing_info["offsets"].append(layer_nr * size_circle)
@@ -117,5 +176,5 @@ class Cylinder():
         return data, indices, self.drawing_info
 
     def getRawData(self):
-        # to integrate the circle in a more complex model:
+        # to integrate the cylinder in a more complex model:
         return self.positions, self.colors, self.indices, self.drawing_info

@@ -19,7 +19,7 @@ class Mesh():
         # vertex buffer object:
         self.VBO = glGenBuffers(1)
         glBindBuffer(GL_ARRAY_BUFFER, self.VBO)
-        glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, self.data, GL_STATIC_DRAW)
+        glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, self.data, GL_DYNAMIC_DRAW)
 
         # element buffer object:
         self.EBO = glGenBuffers(1)
@@ -42,17 +42,6 @@ class Mesh():
         glBindVertexArray(0)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
-
-    def changeData(self, offset, data):
-        # use (structured) numpy arrays, their memory layout is sequential:
-        self.data = data
-        # number of bytes to go from one vertex to the next:
-        stride = self.data.strides[0]
-        offset = c_void_p(stride * offset)
-        # specify the size in bytes of the data store region being replaced:
-        size = data.nbytes
-        # updates a subset of a buffer object's data store
-        glBufferSubData(GL_ARRAY_BUFFER, offset, size, data)
 
     def _draw(self, mode, size, offset):
         # bind the VAO, it contains all info about the buffers and attributes:
