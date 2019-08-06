@@ -25,7 +25,6 @@ class Mesh():
 
         # vertex buffer object:
         self.VBO = glGenBuffers(1)
-        print("VBO1:", self.VBO)
         glBindBuffer(GL_ARRAY_BUFFER, self.VBO)
         glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, self.data, GL_STATIC_DRAW)
 
@@ -63,4 +62,4 @@ class Mesh():
         glDrawElements(mode, size, GL_UNSIGNED_INT, offset)
 
     def __repr__(self):
-        return "data: {}\nindices: {}\n".format(self.data, self.indices)
+        return "data:\n{}\nindices:\n{}\n".format(self.data, self.indices)
