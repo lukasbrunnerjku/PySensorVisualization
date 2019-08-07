@@ -245,10 +245,11 @@ Cirlce2 -> for the line:
 mode: GL_LINE_LOOP, size: m, offset: 3 * m + 4
 
 Cylinder mantle (therefore we need both circles in one VAO):
-mode: GL_TRIANGLE_STRIP, size: 2 * v_num + 2, offset: 4 * v_num + 4
+note: circle1 needs to be the top and circle2 the bottom of the mantle!
+mode: GL_TRIANGLE_STRIP, size: 2 * m + 2, offset: 4 * m + 4
 """
 m = 32 # blender default value for number of vertices of a circle
-r = 1.0
+r = 0.5
 positions = [[0.0, 0.0, 0.0]]
 colors = [color]
 indices = [0] # this is the circle center
@@ -285,7 +286,7 @@ while phi < 360:
     phi += deltaPhi
     index += 1
 # to get a closed circle:
-indices.append(m + 1) # Cirlce2 -> for the area --- finished!
+indices.append(m + 2) # Cirlce2 -> for the area --- finished!
 
 # Cirlce1 -> for the line:
 for i in range(1, m + 1): # 1,... m
@@ -305,6 +306,9 @@ indices.append(m + 2)
 
 skin_mesh = Mesh(positions, colors, indices)
 print(skin_mesh)
+
+objectSize = m + 1 # the number of positions of a cirlce
+shader.setInt("objectSize", objectSize)
 
 """
 Input:
@@ -337,6 +341,11 @@ def getTranslationRotationMatricesForCircles(mesh):
                                 mesh.positions[i-1][2])
             # normalized gradient vector at p_i:
             v_ni = glm.normalize(p_i - p_i_prev)
+
+            if v_ni == v_n0:
+                rms.append(rm) # append a unit matrix = no rotation
+                continue
+
             angle = glm.acos(glm.length(v_n0 * v_ni)) # get the rotation angle
             rot_axis = glm.cross(v_n0, v_ni) # get the rotation axis
             rm = glm.rotate(rm, angle, rot_axis)
@@ -353,12 +362,59 @@ def getTranslationRotationMatricesForCircles(mesh):
                             mesh.positions[i-1][2])
         # normalized gradient vector at p_i:
         v_ni = glm.normalize(p_i_next - p_i_prev)
+
+        if v_ni == v_n0:
+            rms.append(rm) # append a unit matrix = no rotation
+            continue
+
         angle = glm.acos(glm.length(v_n0 * v_ni)) # get the rotation angle
         rot_axis = glm.cross(v_n0, v_ni) # get the rotation axis
         rm = glm.rotate(rm, angle, rot_axis)
         rms.append(rm) # append the rotation matrix
 
     return rms, tms
+
+"""
+Input:
+The mesh of a pose which held n positions for the circle centers
+"""
+def drawSkinFromBoneMesh(mesh):
+    rms, tms = getTranslationRotationMatricesForCircles(mesh)
+    prev_transform = None
+    for rm, tm in zip(rms, tms):
+        if prev_transform is None:
+            # draw the bottom area of the actuator:
+            prev_transform = tm * rm
+            shader.setMatrix("model1", prev_transform)
+            shader.setInt("lflag", 0)
+            skin_mesh.draw(GL_TRIANGLE_FAN, m + 2, m + 2)
+
+        # here we use the objectSize uniform variable and the tsflag to
+        # get different model matrices for the circles:
+        shader.setInt("lflag", 0)
+        shader.setInt("tsflag", 1)
+        # model1 applied on circle1 and model2 on circle2
+        shader.setMatrix("model2", prev_transform)
+        cur_transform = tm * rm
+        shader.setMatrix("model1", cur_transform)
+        prev_transform = cur_transform
+        # use both circles to draw the mantle:
+        skin_mesh.draw(GL_TRIANGLE_STRIP, 2 * m + 2, 4 * m + 4)
+        # use circle2 to draw the black rings:
+        shader.setInt("lflag", 1)
+        skin_mesh.draw(GL_LINE_LOOP, m, 3 * m + 4)
+
+    # use circle1 to draw the area of the actuator:
+    shader.setInt("lflag", 0)
+    skin_mesh.draw(GL_TRIANGLE_FAN, m + 2, 0)
+    # use circle2 to draw the last black ring:
+    shader.setMatrix("model2", cur_transform)
+    shader.setInt("lflag", 1)
+    skin_mesh.draw(GL_LINE_LOOP, m, 3 * m + 4)
+
+    # reset flags:
+    shader.setInt("lflag", 0)
+    shader.setInt("tsflag", 0)
 
 
 # game loop
@@ -376,27 +432,21 @@ while True:
     shader.setInt("lflag", 0)
     shader.setInt("tsflag", 0)
 
-    """----"""
-    mesh = animation.meshes[-1]
-    rms, tms = getTranslationRotationMatricesForCircles(mesh)
-    for rm, tm in zip(rms, tms):
-        shader.setMatrix("model1", tm * rm)
-        skin_mesh.draw(GL_LINE_LOOP, m, 2 * m + 4)
-    """----"""
-
-    # for object1
-    model1 = glm.mat4()
-    model1 = glm.scale(model1, glm.vec3(1.0, 1.0, 1.0))
-    model1 = glm.translate(model1, glm.vec3(0.0, 0.0, 0.0))
-    model1 = glm.rotate(model1, glm.radians(0.0), glm.vec3(0.0, 0.0, -1.0))
-    shader.setMatrix("model1", model1)
-
-    # for object2
-    model2 = glm.mat4()
-    model2 = glm.scale(model2, glm.vec3(1.0, 1.0, 1.0))
-    model2 = glm.translate(model2, glm.vec3(0.0, 0.0, 0.0))
-    model2 = glm.rotate(model2, glm.radians(0.0), glm.vec3(0.0, 0.0, -1.0))
-    shader.setMatrix("model2", model2)
+    """---uncomment this section to see the skin in detail and still for pose i---"""
+    # i = -1
+    # mesh = animation.meshes[i]
+    # drawSkinFromBoneMesh(mesh)
+    #
+    # model1 = glm.mat4()
+    # shader.setMatrix("model1", model1)
+    # model2 = glm.mat4()
+    # shader.setMatrix("model2", model2)
+    #
+    # shader.setInt("lflag", 0)
+    # animation.meshes[i].draw(GL_LINE_STRIP, 2*(n-2)+2, 0)
+    # shader.setInt("lflag", 1)
+    # animation.meshes[i].draw(GL_POINTS, n, 2*(n-2)+2)
+    """----------------------------------------------------------------"""
 
     """---uncomment this section to see the animation bounds---"""
     # # draw the lines:
@@ -408,19 +458,24 @@ while True:
     # end_points.draw(GL_POINTS, n, 2*(n-2)+2)
     """--------------------------------------------------------"""
 
-    # # draw the animation:
-    # shader.setInt("lflag", 0)
-    # animation.meshes[animation.pose_nr].draw(GL_LINE_STRIP, 2*(n-2)+2, 0)
-    # shader.setInt("lflag", 1)
-    # animation.meshes[animation.pose_nr].draw(GL_POINTS, n, 2*(n-2)+2)
-    # animation.nextFrame()
+    """---uncomment this section to see the animation in motion between start and end pose---"""
+    # draw the animation:
+    model1 = glm.mat4()
+    shader.setMatrix("model1", model1)
+    model2 = glm.mat4()
+    shader.setMatrix("model2", model2)
 
-    """ for testing just last pose """
     shader.setInt("lflag", 0)
-    animation.meshes[-1].draw(GL_LINE_STRIP, 2*(n-2)+2, 0)
+    animation.meshes[animation.pose_nr].draw(GL_LINE_STRIP, 2*(n-2)+2, 0)
     shader.setInt("lflag", 1)
-    animation.meshes[-1].draw(GL_POINTS, n, 2*(n-2)+2)
-    """ ---- """
+    animation.meshes[animation.pose_nr].draw(GL_POINTS, n, 2*(n-2)+2)
+
+    # uncomment the next line and it will apply the skin to the animation
+    drawSkinFromBoneMesh(animation.meshes[animation.pose_nr])
+
+    # to increase or decrease the pose_nr:
+    animation.nextFrame()
+    """-------------------------------------------------------------------------------------"""
 
     # input handler:
     for event in pygame.event.get():
